@@ -47,17 +47,6 @@ disqusShortname = ""
       name = "Home"
       url = "#"
 
-    [[params.navigation.links]]
-      name = "Blogs"
-      url = "blogs"
-
-    [[params.navigation.links]]
-      name = "Generic Blog"
-      url = "blogs/ipsum"
-
-    [[params.navigation.links]]
-      name = "Elements"
-      url = "elements.html"
 
     # Add custom links here by uncommenting code below. To remove links just delete
     # the [[params.navigation.links]] map associated with that link. Copy and paste
@@ -99,26 +88,6 @@ disqusShortname = ""
       url = "blogs/tempus"
 
     
-    # You can make more showcases by copy and pasting the code above
-
-  [params.blog]
-    # All blogs defined in their own files. You can find example blogs
-    # at 'exampleSite/content/blogs'. Copy the 'blogs' folder into the 'content' directory
-    # at the root of this Hugo site.
-    # For more informtion take a look at the README.
-    # To add more blogs just copy and paste the code.
-
-  # Section Type Two
-  [params.two]
-    enable = true
-    title = "Massa libero"
-    subtitle = """Nullam et orci eu lorem consequat tincidunt vivamus et sagittis libero. 
-    Mauris aliquet magna magna sed nunc rhoncus pharetra. 
-    Pellentesque condimentum sem. In efficitur ligula tate urna. Maecenas laoreet massa vel lacinia pellentesque lorem ipsum dolor. 
-    Nullam et orci eu lorem consequat tincidunt. Vivamus et sagittis libero.
-    Mauris aliquet magna magna sed nunc rhoncus amet pharetra et feugiat tempus."""
-    buttonText = "Get Started"
-    url = "blogs"
 
 
   # Contact section
@@ -149,7 +118,7 @@ disqusShortname = ""
 
     [[params.contact.phone]]
     title = "Phone"
-    phone = "(+66) 231-2314 x1234"
+    phone = "(+66) 231-2314 4444"
 
     [[params.contact.address]]
     title = "363"
@@ -160,7 +129,7 @@ disqusShortname = ""
   # Footer section
   [params.footer]
     enable = true
-    copyright = "Company Name"
+    copyright = "Arun's Company"
 
     # Uses font awesome icons
     [[params.footer.social]]
@@ -168,3 +137,7 @@ disqusShortname = ""
       url= "https://github.com/aafzali1"
       label = "Github"
 
+    [[params.footer.social]]
+      icon = "fa-twitter"
+      url= "https://twitter.com/ArunAfzali"
+      label = "Twitter"
