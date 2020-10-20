@@ -1,0 +1,252 @@
+---
+title: "IF"
+output: html_document
+---
+
+
+
+```{r setup}
+
+# Load all relevant packages
+
+library(tidyverse)  
+library(mosaic)
+library(ggthemes)
+library(lubridate)
+library(fivethirtyeight)
+library(here)
+library(skimr)
+library(janitor)
+library(vroom)
+library(tidyquant)
+library(rvest)
+library(purrr)  
+library(lubridate)
+library(kableExtra)
+library(knitr)
+library(dplyr)
+library(gapminder)
+library(ggplot2)
+library(leaflet.providers)
+library(leaflet)
+library(patchwork)
+library(corrplot)
+library(readxl)
+library(lubridate)
+library(data.table)
+library(readr)
+
+
+
+# Load the Dataset
+CRD = read.csv("CRD2.csv")
+CRD <- CRD[,colSums(is.na(CRD))<nrow(CRD)]
+
+KELY = read.csv("KELY2.csv")
+KELY <- KELY[,colSums(is.na(KELY))<nrow(KELY)]
+
+WSO = read.csv("WSO2.csv")
+WSO <- WSO[,colSums(is.na(WSO))<nrow(WSO)]
+
+RDI = read.csv("RDI2.csv")
+RDI <- RDI[,colSums(is.na(RDI))<nrow(RDI)]
+
+
+
+#CLEANING
+## Renaming Columns
+names(CRD) <- CRD %>% slice(1) %>% unlist()
+CRD <- CRD %>% slice(-1,-2)
+
+
+names(KELY) <- KELY %>% slice(1) %>% unlist()
+KELY <- KELY %>% slice(-1,-2)
+
+
+names(RDI) <- RDI %>% slice(1) %>% unlist()
+RDI <- RDI %>% slice(-1,-2)
+
+names(WSO) <- WSO %>% slice(1) %>% unlist()
+WSO <- WSO %>% slice(-1,-2)
+
+## Deleting first 521 Rows to get open of Market
+
+CRDt = tail(CRD,-521)
+KELYt = tail(KELY,-521)
+RDIt = tail(RDI,-521)
+WSOt = tail(WSO,-520)
+
+## As numeric EXCEPT FOR DATES
+
+CRDt2 = CRDt %>%
+  select(-Dates) %>% # this removes the alpha column if all your character columns need converted to numeric
+  mutate_if(is.character,as.numeric)
+
+CRDt2$Dates = CRDt$Dates
+
+
+KELYt2 = KELYt %>%
+  select(-Dates) %>% # this removes the alpha column if all your character columns need converted to numeric
+  mutate_if(is.character,as.numeric)
+
+KELYt2$Dates = KELYt$Dates
+
+
+RDIt2 = RDIt %>%
+  select(-Dates) %>% # this removes the alpha column if all your character columns need converted to numeric
+  mutate_if(is.character,as.numeric)
+
+RDIt2$Dates = RDIt$Dates
+
+
+WSOt2 = WSOt %>%
+  select(-Dates) %>% # this removes the alpha column if all your character columns need converted to numeric
+  mutate_if(is.character,as.numeric)
+
+WSOt2$Dates = WSOt$Dates
+
+## Converting Trade Volume, Ask Volume and Bid Volume to per share basis
+
+WSOt2$`Trade Value`= WSOt2$`Trade Value` / WSOt2$`Trade Volume`
+WSOt2$`Bid Value`= WSOt2$`Bid Value` / WSOt2$`Bid Volume`
+WSOt2$`Ask Value`= WSOt2$`Ask Value` / WSOt2$`Ask Volume`
+
+RDIt2$`Trade Value`= RDIt2$`Trade Value` / RDIt2$`Trade Volume`
+RDIt2$`Bid Value`= RDIt2$`Bid Value` / RDIt2$`Bid Volume`
+RDIt2$`Ask Value`= RDIt2$`Ask Value` / RDIt2$`Ask Volume`
+
+KELYt2$`Trade Value`= KELYt2$`Trade Value` / KELYt2$`Trade Volume`
+KELYt2$`Bid Value`= KELYt2$`Bid Value` / KELYt2$`Bid Volume`
+KELYt2$`Ask Value`= KELYt2$`Ask Value` / KELYt2$`Ask Volume`
+
+CRDt2$`Trade Value`= CRDt2$`Trade Value` / CRDt2$`Trade Volume`
+CRDt2$`Bid Value`= CRDt2$`Bid Value` / CRDt2$`Bid Volume`
+CRDt2$`Ask Value`= CRDt2$`Ask Value` / CRDt2$`Ask Volume`
+
+## CONVERSION FOR B CLASS SHARES
+
+WSOt2$`B Trade Value`= WSOt2$`B Trade Value` / WSOt2$`B Trade Volume`
+WSOt2$`B Bid Value`= WSOt2$`B Bid Value` / WSOt2$`B Bid Volume`
+WSOt2$`B Ask Value`= WSOt2$`B Ask Value` / WSOt2$`B Ask Volume`
+
+RDIt2$`B Trade Value`= RDIt2$`B Trade Value` / RDIt2$`B Trade Volume`
+RDIt2$`B Bid Value`= RDIt2$`B Bid Value` / RDIt2$`B Bid Volume`
+RDIt2$`B Ask Value`= RDIt2$`B Ask Value` / RDIt2$`B Ask Volume`
+
+KELYt2$`B Trade Value`= KELYt2$`B Trade Value` / KELYt2$`B Trade Volume`
+KELYt2$`B Bid Value`= KELYt2$`B Bid Value` / KELYt2$`B Bid Volume`
+KELYt2$`B Ask Value`= KELYt2$`B Ask Value` / KELYt2$`B Ask Volume`
+
+CRDt2$`B Trade Value`= CRDt2$`B Trade Value` / CRDt2$`B Trade Volume`
+CRDt2$`B Bid Value`= CRDt2$`B Bid Value` / CRDt2$`B Bid Volume`
+CRDt2$`B Ask Value`= CRDt2$`B Ask Value` / CRDt2$`B Ask Volume`
+
+
+## FORMATTING DATES
+
+CRDt2$Date <- as.Date(CRDt2$Dates)
+KELYt2$Date <- as.Date(KELYt2$Dates)
+WSOt2$Date <- as.Date(WSOt2$Dates)
+RDIt2$Date <- as.Date(RDIt2$Dates)
+
+
+## IMPROVING TRADE VALUE ASK VALUE YIELD VALUE TO BE HIGHEST AT THAT POINT
+
+CRDt2$`Trade Value` = na.locf(CRDt2$`Trade Value`)
+
+KELYt2$`Trade Value` = na.locf(KELYt2$`Trade Value`)
+
+WSOt2$`Trade Value` = na.locf(WSOt2$`Trade Value`, na.rm = FALSE)
+
+RDIt2$`Trade Value` = na.locf(RDIt2$`Trade Value`, na.rm = FALSE)
+
+
+CRDt2$`B Trade Value` = na.locf(CRDt2$`B Trade Value`)
+
+KELYt2$`B Trade Value` = na.locf(KELYt2$`B Trade Value`)
+
+WSOt2$`B Trade Value` = na.locf(WSOt2$`B Trade Value`, na.rm = FALSE)
+
+RDIt2$`B Trade Value` = na.locf(RDIt2$`B Trade Value`, na.rm = FALSE)
+
+## Setting up Percent Differences
+
+WSOt2$percentdifferece = (WSOt2$`Trade Value` - WSOt2$`B Trade Value`) / WSOt2$`B Trade Value` 
+KELYt2$percentdifferece = (KELYt2$`Trade Value` - KELYt2$`B Trade Value`) / KELYt2$`B Trade Value` 
+RDIt2$percentdifferece = (RDIt2$`Trade Value` - RDIt2$`B Trade Value`) / RDIt2$`B Trade Value` 
+CRDt2$percentdifferece = (CRDt2$`Trade Value` - CRDt2$`B Trade Value`) / CRDt2$`B Trade Value` 
+
+## Is trade Value greater 0.76 percent
+
+WSOt2$arbitrage=ifelse(abs(WSOt2$percentdifferece)>0.0076, 'TRUE', 'false')
+KELYt2$arbitrage=ifelse(abs(KELYt2$percentdifferece)>0.0076, 'TRUE', 'false')
+RDIt2$arbitrage=ifelse(abs(RDIt2$percentdifferece)>0.0076, 'TRUE', 'false')
+CRDt2$arbitrage=ifelse(abs(CRDt2$percentdifferece)>0.0076, 'TRUE', 'false')
+
+
+## Graphing Trade Price Spread
+
+ggplot() + geom_line(data = CRDt2, aes(x= Dates, y = `Trade Value`), group = 1, color = 'blue') + geom_line(data = CRDt2, aes(x= Dates, y = `B Trade Value`), group = 1, color = 'red')
+
+## WHERE WSO IS BF/A BF/B
+
+ggplot() + geom_line(data = WSOt2, aes(x= Dates, y = `Trade Value`), group = 1, color = 'blue') + geom_line(data = WSOt2, aes(x= Dates, y = `B Trade Value`), group = 1, color = 'red') 
+
+## KELY
+ggplot() + geom_line(data = KELYt2, aes(x= Dates, y = `Trade Value`), group = 1, color = 'blue') + geom_line(data = KELYt2, aes(x= Dates, y = `B Trade Value`), group = 1, color = 'red') 
+
+
+##RDI
+
+ggplot() + geom_line(data = RDIt2, aes(x= Dates, y = `Trade Value`), group = 1, color = 'blue') + geom_line(data = RDIt2, aes(x= Dates, y = `B Trade Value`), group = 1, color = 'red') 
+
+```
+
+
+
+
+```{r data analysis}
+
+#OUTPUTS FOR ELIA & ISMAEEL
+
+## Checking for intersections for closing positions
+##Detecting Sign change on percent difference. This is when we can close our Positions.
+
+#row numbers where positions can be closed
+CLOSEWSO = which(diff(sign(WSOt2$percentdifferece))!=0) #WSO -> Which is actually BF/A BF/B
+
+CLOSERDI = which(diff(sign(RDIt2$percentdifferece))!=0) #RDI
+
+CLOSECRD = which(diff(sign(CRDt2$percentdifferece))!=0) #CRD
+
+CLOSEKELY = which(diff(sign(KELYt2$percentdifferece))!=0) #KELY
+
+#PRINT DATE-TIME to CLOSE POSITIONS
+
+WSOt2[CLOSEWSO, "Dates" ] #WSO
+RDIt2[CLOSERDI, "Dates" ] #RDI
+CRDt2[CLOSECRD, "Dates" ] #CRD
+KELYt2[CLOSEKELY, "Dates" ] #KELY
+
+## DF in which % Difference is > 0.0076 (WHEN POSITIONS SHOULD BE OPENED)
+OpenCRD = CRDt2[!duplicated(CRDt2$percentdifferece), ]
+OpenCRD2 = filter(OpenCRD, arbitrage == "TRUE")
+
+OpenWSO = WSOt2[!duplicated(WSOt2$percentdifferece), ]
+OpenWSO2 = filter(OpenWSO, arbitrage == "TRUE")
+
+OpenKELY = KELYt2[!duplicated(KELYt2$percentdifferece), ]
+OpenKELY2 = filter(OpenKELY, arbitrage == "TRUE")
+
+OpenRDI = RDIt2[!duplicated(RDIt2$percentdifferece), ]
+OpenRDI2 = filter(OpenRDI, arbitrage == "TRUE")
+
+
+## PRINT DATE-TIME TO OPEN POSITIONS
+
+OpenWSO2[, "Dates" ]
+OpenRDI2[, "Dates" ]
+OpenCRD2[, "Dates" ]
+OpenKELY2[, "Dates" ]
+
+```

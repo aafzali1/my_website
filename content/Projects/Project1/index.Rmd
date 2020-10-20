@@ -1,0 +1,998 @@
+---
+title: "Final Group Project - AirBnB Analytics - Istanbul"
+author: "Group 17A"
+date: "18/10/2020"
+output:
+  html_document:
+    theme: flatly
+    highlight: zenburn
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    code_folding: show
+---
+
+# Executive Summary
+
+In this report, we analyze data about AirBnB listings and fit a model to predict the total cost for 2 people staying 4 nights in an AirBnB in Istanbul. 
+
+We download AirBnB data from insideairbnb.com, which was originally scraped from airbnb.com.
+
+**Purpose:**
+1. Perform a logical exploratory data analysis;
+2. Select explanatory variables for regression purposes through plotting data;
+3. Conduct a robust regression analysis with selected variables;
+4. Figure out variables with collinearity and use shortlisted data sets for predictive and informative purposes;
+5. Based on the analysis above, predict the total cost for 2 people spending 4 nights in Istanbul.
+
+**Methodology:**
+1. Use glimpse and skim functions to inspect the data features;
+2. Take parsing exercises to make the data fit for purpose;
+3. Employ insights from data through visualizations methods.
+
+**Predictions:**
+From our regression analysis, we predict with a 95% level of confidence that the cost for 2 people of staying in an AirBnB in Istanbul for 4 nights would be approximately $821. However, we acknowledge that this is subject to the limitations of our analysis, including gaps in our data, subjectivity in selecting variables and the potentially skewing effect of the Covid-19 pandemic.
+
+
+```{r, echo = FALSE}
+
+# Load all relevant packages
+
+library(tidyverse)  
+library(mosaic)
+library(ggthemes)
+library(lubridate)
+library(fivethirtyeight)
+library(here)
+library(skimr)
+library(janitor)
+library(vroom)
+library(tidyquant)
+library(ggthemes)
+library(kableExtra)
+library(ggrepel)
+library(RColorBrewer)
+library(scales)
+library(gridExtra)
+library(infer)
+library(ggfortify)
+library(leaflet)
+library(GGally)
+library(kableExtra)
+library(car)
+library(huxtable)
+
+# Load the AirBnB Dataset
+
+istanbul <- vroom("http://data.insideairbnb.com/turkey/marmara/istanbul/2020-06-28/data/listings.csv.gz") 
+
+```
+
+# Exploratory Data Analysis
+
+## Inspect the data
+
+First, we take a look at the data to get a sense of the variables and the variable types that are included in the data set.
+
+```{r}
+
+#glimpse the dataframe to get a sense of the raw data
+
+glimpse(istanbul)
+
+```
+
+By taking a look at the raw data available on the AirBnB listings in Istanbul, we see that the dataframe is made up of 23,728 observations (rows) and 106 variables (columns). Notably, from the glimpse function above, we see that certain variables are stored with the incorrect data type, specifically we have quantitative variables (eg. price, cleaning_fee, extra_people) incorrectly stored as character variables and we will have to be converted into numeric data throughout the process. 
+
+```{r}
+
+#skim for further inspection of the dataframe
+
+skimr::skim(istanbul)
+
+```
+
+Similarly, the skim function suggests the presence of duplicates and missing values, which will have to be cleaned out.
+
+## Clean the data
+
+Next, to make the size of the data more managable, we exclude from the dataframe the variables we deemed as not needed or improper for the purpose of our analysis. 
+
+```{r}
+
+# Select the relevant variables for our analyses
+
+istanbul_listings <- istanbul %>% 
+  
+  select (id,
+          listing_url,
+          price, 
+          cleaning_fee, 
+          extra_people, 
+          property_type, 
+          room_type,
+          number_of_reviews,
+          review_scores_rating,
+          latitude,
+          longitude,
+          is_location_exact,
+          neighbourhood,
+          neighbourhood_cleansed,
+          neighbourhood_group_cleansed,
+          bathrooms,
+          bedrooms,
+          beds,
+          host_identity_verified,
+          host_is_superhost,
+          accommodates,
+          cancellation_policy,
+          minimum_nights,
+          guests_included)
+
+# Take a look at the chosen variables to observe missing values
+
+skimr::skim(istanbul_listings)
+
+```
+
+## Data wrangling
+
+We proceed to convert the relevant data columns into numeric values.
+
+```{r}
+
+#turn prices, cleaning_fee and extra people into a numeric column, and remove the '$' and ','
+
+istanbul_listings <- transform(
+  istanbul_listings, 
+  price=as.numeric(sub("\\$","",sub(",","", price)), na.rm=TRUE),
+  cleaning_fee=as.numeric(sub("\\$","", sub(",","", cleaning_fee)),na.rm=TRUE),
+  extra_people=as.numeric(sub("\\$","", sub(",","", extra_people)),na.rm=TRUE))
+
+```
+
+Besides, we remove duplicated listings within id and missing values within price.
+
+```{r}
+
+istanbul_listings_cleaned <- istanbul_listings %>%
+  
+  #remove duplicate ids
+  filter(duplicated(id) == FALSE) %>%
+  
+  #remove listings with missing price
+  filter(is.na(price) == FALSE)
+  
+```
+
+Next, we clean other variables using the same way.
+
+```{r}
+
+#create a new column with NAs replaced with 0s for cleaning_fee
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>%
+  mutate(cleaning_fee_cleaned = case_when(is.na(cleaning_fee) ~ 0, TRUE ~ cleaning_fee))
+
+```
+
+```{r}
+
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>%
+  mutate(
+    neighbourhood_group_cleaned = case_when( 
+    
+      #create variable that clusters neighbourhoods for further analysis
+      neighbourhood_cleansed == "Arnavutkoy" ~ "European Side",
+      neighbourhood_cleansed == "Avcilar" ~ "European Side",
+      neighbourhood_cleansed == "Bagcilar" ~ "European Side",
+      neighbourhood_cleansed == "Bagcilar" ~ "European Side",
+      neighbourhood_cleansed == "Bahcelievler" ~ "European Side",
+      neighbourhood_cleansed == "Bakirkoy" ~ "European Side",
+      neighbourhood_cleansed == "Basaksehir" ~ "European Side",
+      neighbourhood_cleansed == "Bayrampasa" ~ "European Side",
+      neighbourhood_cleansed == "Besiktas" ~ "European Side",
+      neighbourhood_cleansed == "Beylikduzu" ~ "European Side",
+      neighbourhood_cleansed == "Beyoglu" ~ "European Side",
+      neighbourhood_cleansed == "Buyukcekmece" ~ "European Side",
+      neighbourhood_cleansed == "Catalca" ~ "European Side",
+      neighbourhood_cleansed == "Esenler" ~ "European Side",
+      neighbourhood_cleansed == "Esenyurt" ~ "European Side",
+      neighbourhood_cleansed == "Eyup" ~ "European Side",
+      neighbourhood_cleansed == "Fatih" ~ "European Side",
+      neighbourhood_cleansed == "Gaziosmanpasa" ~ "European Side",
+      neighbourhood_cleansed == "Gungoren" ~ "European Side",
+      neighbourhood_cleansed == "Kagithane" ~ "European Side",
+      neighbourhood_cleansed == "Kucukcekmece" ~ "European Side",
+      neighbourhood_cleansed == "Sariyer" ~ "European Side",
+      neighbourhood_cleansed == "Silivri" ~ "European Side",
+      neighbourhood_cleansed == "Sultangazi" ~ "European Side",
+      neighbourhood_cleansed == "Sisli" ~ "European Side",
+      neighbourhood_cleansed == "Zeytinburnu" ~ "European Side",
+      neighbourhood_cleansed == "Adalar" ~ "Asian Side",
+      neighbourhood_cleansed == "Atasehir" ~ "Asian Side",
+      neighbourhood_cleansed == "Beykoz" ~ "Asian Side",
+      neighbourhood_cleansed == "Cekmekoy" ~ "Asian Side",
+      neighbourhood_cleansed == "Kadikoy" ~ "Asian Side",
+      neighbourhood_cleansed == "Kartal" ~ "Asian Side",
+      neighbourhood_cleansed == "Maltepe" ~ "Asian Side",
+      neighbourhood_cleansed == "Pendik" ~ "Asian Side",
+      neighbourhood_cleansed == "Sancaktepe" ~ "Asian Side",
+      neighbourhood_cleansed == "Sultanbeyli" ~ "Asian Side",
+      neighbourhood_cleansed == "Sile" ~ "Asian Side",
+      neighbourhood_cleansed == "Tuzla" ~ "Asian Side",
+      neighbourhood_cleansed == "Umraniye" ~ "Asian Side",
+      neighbourhood_cleansed == "Uskudar" ~ "Asian Side"))
+
+```
+
+```{r}
+
+#create a new column with NAs replaced with 0s for extra_people
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>%
+  mutate(extra_people_cleaned = case_when(is.na(extra_people) ~ 0, TRUE ~ extra_people))
+
+```
+
+```{r}
+
+#adjust the property_type
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>%
+  mutate(prop_type_simplified = case_when(property_type %in% c("Apartment",
+                                                               "Condominium", 
+                                                               "Serviced apartment",
+                                                               "House", 
+                                                               "Hostel") 
+                                          ~ property_type, TRUE ~ "Other" ))
+
+#visualize the most common property types
+
+istanbul_listings_cleaned %>% 
+  group_by(prop_type_simplified) %>%
+  tally() %>%
+  arrange(desc(n)) %>%
+  rename("Property Type" = prop_type_simplified) %>%
+
+#format the table for HTML
+  
+kbl(caption = "Property type of Airbnb listings in Istanbul") %>%
+  kable_styling()
+
+```
+
+For the variable bedrooms, we notice the unusual value of zero, as seen from the graph below. And we proceed to remove the missing values (NAs).
+
+```{r}
+
+#remove NAs
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>%
+  filter(is.na(beds) == FALSE) %>%
+  filter(is.na(bedrooms) == FALSE)
+
+#plot histogram for price and price 4 nights
+
+bedroom_plot <- istanbul_listings_cleaned %>%
+  group_by(bedrooms) %>%
+  tally() %>%
+  ggplot() + 
+  geom_col(aes(x = bedrooms, y = n), alpha = 0.9) + 
+  geom_hline(aes(yintercept = 0), size = 1) + 
+  labs(title = "Listings with no bedrooms in the data",
+       subtitle = "Distribution of the number of bedrooms",
+       y = 'Count',
+       x = 'Number of bedrooms') + 
+  theme_clean()
+
+bed_plot <- istanbul_listings_cleaned %>%
+  group_by(beds) %>%
+  tally() %>%
+  ggplot() + 
+  geom_col(aes(x = beds, y = n), alpha = 0.9) + 
+  geom_hline(aes(yintercept = 0), size = 1) + 
+  labs(title = "Listings with no beds in the data",
+       subtitle = "Distribution of the number of beds",
+       y = 'Count',
+       x = 'Number of beds') + 
+  theme_clean()
+
+grid.arrange(bedroom_plot, bed_plot, nrow = 2)
+
+```
+
+Next we inspect the neighborhoods and order them by number of listings. 
+
+```{r}
+
+#inspect neighborhoods and ordering them by number of listings
+
+istanbul_listings_cleaned %>% group_by(neighbourhood_group_cleaned) %>% 
+  tally() %>% 
+  arrange(desc(n)) %>% 
+  rename("Area"= neighbourhood_group_cleaned, "Total Listings" = n) %>% 
+  
+#Format the table for HTML
+  
+kbl(caption = "Concentration of Airbnb Listings in Istanbul") %>% 
+  kable_styling()
+
+```
+
+Some of the observations are also missing data points (NAs) for the variables host_is_identified and host_is_superhost, which we remove below.
+
+We also remove the observations which lack a data point for review_scores_rating. Whilst we are aware that this will reduce the volume of the data frame significantly (of almost 3000 observations), we want to prioritize the quality of the data over the quantity and are confident that the remaining data frame represents a sufficient sample size for a reliable analysis.
+
+```{r}
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>%
+  
+#remove NAs
+  filter(is.na(host_is_superhost) == FALSE) %>%
+  
+  filter(is.na(host_identity_verified) == FALSE) %>%
+
+  filter(is.na(review_scores_rating) == FALSE)
+
+```
+
+Given that we want to analyse a stay of 4 nights, we will filter out from the dataframe the listings that require a minimum of a 5 night stay.
+
+```{r}
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>%
+  
+  #remove listings that do not require more than 4 nights 
+  filter(minimum_nights < 5) 
+
+```
+
+We will also filter out data that only accommodates 1.
+
+```{r}
+
+istanbul_listings_cleaned <- istanbul_listings_cleaned %>% 
+  filter(accommodates > 1)
+
+```
+
+We update the dataframe by removing the now outdated columns, which have been cleaned above and compute accommodation cost for 4 nights for 2 people.
+
+```{r}
+
+istanbul_listings_final <- istanbul_listings_cleaned %>%
+  
+  #remove unwanted columns from the data frame 
+  select(-c(cleaning_fee, 
+            property_type, 
+            extra_people)) 
+
+  #create a new column with the price for 4 nights for 2 people per listing
+  istanbul_listings_final$price_4_nights = 
+    istanbul_listings_cleaned$price * 4 + 
+    istanbul_listings_cleaned$cleaning_fee_cleaned + 
+    istanbul_listings_cleaned$extra_people_clean
+
+```
+
+```{r}
+
+#skim the updated dataframe
+
+skim(istanbul_listings_final)
+
+```
+
+## Summary statistics
+
+```{r}
+
+summary(istanbul_listings_final)
+
+```
+
+From an initial overview of our summary statistics we extracted 5 main observations:
+
+1.The price has a significantly higher mean than its median (428.8 and 267.0 respectively), suggesting the presence of outliers (particularly expensive listings) pushing the mean upward.
+2.The number_of_reviews have an average of 18.87 reviews and a median of 6.00, but a maximum of 345.00, which is a surprisingly high number of reviews, likely an exception in our data, which also what pushed up the mean from the median.
+3.The maximum cleaning_fee is of $2115, which is significantly greater that the average fee of 74.52, which will increase the overall price for that listing. 
+4.Unsurprisingly, price_4_nights have a higher variation than price, as this is a combination of several charges.
+5.Comparing the 75th percentile with the maximum value for our variables we note that both beds and guests_included have an outlier. Moreover, it is unusual how guests_included go up to 16 but beds actually goes up to 61.
+
+```{r}
+
+#run favstats on some interesting variable combinations and keep the most interesting ones
+
+favstats(price ~ accommodates, data=istanbul_listings_final) 
+
+```
+
+
+```{r}
+
+favstats(price ~ neighbourhood_cleansed, data=istanbul_listings_final)
+
+```
+
+```{r}
+
+favstats(price ~ host_is_superhost, data=istanbul_listings_final)
+
+```
+```{r}
+
+favstats(price ~ prop_type_simplified, data=istanbul_listings_final)
+
+```
+
+```{r}
+
+favstats(price ~ minimum_nights, data=istanbul_listings_final)
+
+```
+
+## Correlation Matrix
+
+From the summary and favstats investigations, we have decided to conduct further exploratory data analysis. We will first build a correlation martix to spot the relationships between the particular variables.
+
+```{r}
+
+istanbul_listings_final %>% 
+  select("price_4_nights",
+                      "review_scores_rating",
+                      "extra_people_cleaned",
+                      "guests_included",
+                      "host_is_superhost",
+                      "cancellation_policy",
+                      "accommodates") %>%
+  ggpairs() +
+  theme_minimal(base_size=6)
+
+```
+
+## Informative visualizations
+
+```{r}
+
+ggplot(istanbul_listings_final,
+       aes(x=number_of_reviews)) +
+  geom_histogram(binwidth = 4) +
+  xlim(0,250) +
+  ylim(0,1000) +
+  labs(title="Most of the airbnb accomodations have up to 20 reviews", 
+       x="Number of Reviews", 
+       y="Quantity") +
+  theme_bw()
+
+```
+
+
+```{r}
+
+#heavily right-skewed
+
+ggplot(istanbul_listings_final, 
+       aes(x=price_4_nights)) +
+  geom_density(bins=20) +
+  xlim(0,4000) +
+  labs(title="The density plot of total price for 4 nights is heavily right-skwed", 
+       x="Density",  
+       y="Total price for 4 nights") +
+  theme_bw()
+
+```
+
+```{r}
+
+#log also heavily right skewed
+
+ggplot(istanbul_listings_final, 
+       aes(x=price_4_nights)) +
+  geom_density(bins=20) +
+  scale_x_log10() +
+  xlim(0,2500) +
+  labs(title="Logarithmic Total Price Shows Nature of Price Clusters", 
+       x="Density",  
+       y="Total price for 4 nights")+
+  theme_bw()
+
+```
+
+```{r}
+
+#histogram to show frequency
+
+ggplot(istanbul_listings_final, 
+       aes(x=price_4_nights)) +
+  geom_histogram(bins=100) +
+  xlim(0,2500) +
+  labs(title="Most Airbnbs cost around €300 for 4 Nights", 
+       x="Total price for 4 nights", 
+       y= "Quantity") +
+  theme_bw()
+
+```
+
+```{r}
+
+istanbul_listings_final %>%
+  group_by(room_type) %>%
+  summarize(mean_price_roomtype = mean(price_4_nights)) %>%
+  arrange(desc(mean_price_roomtype)) %>%
+  ggplot(aes(y=reorder(room_type, 
+                       mean_price_roomtype), 
+             x = mean_price_roomtype)) +
+  geom_col() +
+  labs(title="What are The Most Expensive Airbnb's in Istanbul?",
+       subtitle="Hotels! who would have thought?", 
+       x="Average price for 4 nights per room",  
+       y="Room type") +
+  theme_bw()
+
+```
+```{r}
+
+#Calculate mean price for 4 nights per room type by group cleansed
+
+istanbul_listings_final %>%
+  group_by(neighbourhood_cleansed) %>%
+  summarize(mean_price_neighbourhood = mean(price_4_nights)) %>%
+  arrange(desc(mean_price_neighbourhood)) %>%
+  ggplot(aes(y=reorder(neighbourhood_cleansed, 
+                       mean_price_neighbourhood), 
+             x=mean_price_neighbourhood)) +
+    geom_col() +
+  labs(title="Average price for 4 nights per in particular neighbourhoods", 
+       x="Average price for per room",  
+       y="Neighbourhood")+
+  theme_bw()
+
+```
+
+```{r}
+
+#Calculate mean price for 4 nights by type
+
+istanbul_listings_final %>%
+  group_by(prop_type_simplified) %>%
+  summarize(mean_price_property = mean(price_4_nights)) %>%
+  arrange(desc(mean_price_property)) %>%
+  ggplot(aes(y=reorder(prop_type_simplified, 
+                       mean_price_property), 
+             x = mean_price_property)) + 
+  geom_col() +
+  labs(title="Lofts Come at a Premium in Istanbul, Houses Present a Good Value Proposition", 
+       x="Average price for per room",  
+       y="Property type") +
+  theme_bw()
+
+```
+
+
+```{r}
+
+#Calculate Listing Counts for 4 nights per property type
+
+istanbul_listings_final %>%
+  group_by(prop_type_simplified) %>%
+  mutate(count_property=count("Apartment")) %>%
+  arrange((count_property)) %>%
+  ggplot(aes(x=reorder(prop_type_simplified, 
+                       desc(count_property)), 
+             y = count_property)) + 
+    geom_col() +
+  labs(title="Apartments Dominate Airbnb's Listings", 
+       x="Property type",  
+       y="Quantity") +
+  theme_bw()
+
+```
+
+```{r}
+
+#Average price per 4 nights for Airbnb
+
+istanbul_listings_final %>%
+ group_by(cancellation_policy) %>%
+  ggplot(aes(x=reorder(cancellation_policy,
+                       price_4_nights ), 
+             y = price_4_nights)) + 
+    geom_boxplot() +
+      labs(title="Average prices per 4 nights for an Airbnb according to particular cancellation policies", 
+           y="Price",  
+           x="Cancellation policy") +
+  scale_y_log10(limits=c(100,10000)) +
+  theme_bw()
+
+```
+
+
+# Mapping
+
+Now, we will conduct the mapping of our locations on the Istanbul map. We decide to colour our data in regards to a particular zone they are located in, to have a better sense of the density of the accommodation in these zones. The zones were grouped by highest mean rental price, since it created the largest significance in our models later on.
+
+```{r}
+
+leaflet(data = filter(istanbul_listings_final, 
+                      minimum_nights <= 4)) %>% 
+  addProviderTiles("OpenStreetMap.Mapnik") %>% 
+  addCircleMarkers(lng = ~longitude, 
+                   lat = ~latitude, 
+                   radius = 1, 
+                   fillColor = "#e6550d", 
+                   fillOpacity = 0.9, 
+                   popup = ~listing_url,
+                   label = ~prop_type_simplified)
+
+```
+
+# Regression Analysis
+
+We begin by omitting some variables that we will not be using in our regression analysis and converting character variables to factors. 
+
+In this section, we fit linear models to predict the total cost for 2 people to stay at the AirBnB property for 4 nights, in other words, the price_4_nights variable. 
+
+In the following subsections, we investigate the significance of various predictors for predicting this variable.
+
+```{r}
+
+regression_data <- istanbul_listings_final %>% 
+  
+  #deselect variables not needed for the regression model
+  select(-c(id, 
+            listing_url, 
+            latitude, 
+            longitude, 
+            neighbourhood, 
+            price, 
+            cleaning_fee_cleaned, 
+            extra_people_cleaned)) %>%  
+ 
+   #convert categorical variables to factors
+  transform(room_type =as.factor(room_type),
+            neighbourhood_cleansed = as.factor(neighbourhood_cleansed),
+            neighbourhood_group_cleansed = as.factor(neighbourhood_group_cleansed),
+            cancellation_policy = as.factor(cancellation_policy),
+            prop_type_simplified = as.factor(prop_type_simplified))
+
+#viewing the data frame for the regression 
+glimpse(regression_data)
+
+```
+
+## Model 1
+
+We first fit a linear model called model1 using prop_type_simplified, number_of_reviews, and review_scores_rating and plot the output and summary statistics to evaluate the significance of these variables as predictors. The key metrics that we will be examining to evaluate the above are:
+1.R-squared adjusted: measurement of the extent of the variance of the outcome variable that is explained by the model.
+2. P Values: indicates whether the independent explanatory variable is significant to the model (when below 0.05 it can be deemed significant).
+3. T Stat: serves the same function as the P Value, suggesting whether the independent explanatory variable is significant to the model (when above 2 it can be deemed significant).
+4. Variance Inflation Factor (VIFs): enable us to check for multicollinearity in our model. Since these are not provided in the summary table for the model, we will be computing this with the vif function in the car package.
+
+```{r}
+
+#Linear regression between price_4_night and prop_type_simplified, number_of_reviews, and review_scores_rating
+
+model1<- lm(log(price_4_nights) ~ prop_type_simplified + 
+              number_of_reviews + 
+              review_scores_rating,
+            data=regression_data)
+
+#Look at model result
+
+msummary(model1)
+
+```
+
+```{r}
+
+#Check VIF
+
+car::vif(model1)
+
+```
+
+After running model1, we can notice our dummy variable “prop_type_simplified” turned out to be insignificant for Condominium, House and Other property types. But we will keep the variable prop_type_simplified as some of it’s variables are important for our model. Our Adjusted R-squared in this model is only 1.08%. We will try to fit more variables in our model in order to increase the accuracy.
+
+We will add as well an example of interpretation of our data in logarithmic lm model.
+
+The coefficient interpretation of review_scores_rating in regards to total_price_4_days is as follows: If the review_scores_rating increases by one, the total_price_4_days increases by 0.133%.
+
+The coefficient interpretation of prop_type_simplified in regards to total_price_4_days is as follows: In regards to a particular property type the total_price_4_days behaves as follows: 
+1. - (property type: Apartment) : total_price_4_days just takes the “Intercept” variable and increases by 6.94%;
+2. - (property type: Condominium) : prop_type_simplifiedCondominium=1; total_price_4_days decreases by 0.03%; 
+3. - (property type: Hostel): prop_type_simplifiedHostel=1; total_price_4_days decreases by 0.67%;
+4. - (property type: House): prop_type_simplifiedHouse=1; total_price_4_days decreases by 0.02%;
+5. - (property type: Other): prop_type_simplifiedOther=1; total_price_4_days increases by 0.06%;
+6. - (property type: Serviced apartment): prop_type_simplifiedServiced apartment=1; total_price_4_days increases by 0.17%.
+
+## Model 2
+
+```{r}
+
+#Add room_type in to linear regression model.
+
+model2<- lm(log(price_4_nights) ~ prop_type_simplified +
+              number_of_reviews + 
+              review_scores_rating + 
+              room_type,
+            data=regression_data)
+
+#Look at model result
+
+msummary(model2)
+
+```
+
+```{r}
+
+#Check VIF
+
+car::vif(model2)
+
+```
+
+The room_type has increased our adjusted R-squared up to 21.3%. The p-value for each room type is less than 0.05, thus the room type variable is important and we will keep it in our model.
+
+## Model 3
+
+We consider whether the number bathrooms, bedrooms, beds, or size of the house (accommodates) can be significant predictors of price_4_nights.
+
+```{r}
+
+#Continually add bathrooms, beds, bedrooms and the size of the house in to linear regression model
+
+model3 <-lm(log(price_4_nights)~prop_type_simplified +
+              number_of_reviews +
+              room_type +
+              bathrooms +
+              bedrooms +
+              beds +
+              accommodates, 
+            data=regression_data)
+
+#Look at model result
+
+msummary(model3)
+
+```
+
+```{r}
+
+#Check VIF
+
+car::vif(model3)
+
+```
+
+All the variables in our model apart from “beds” variable are significant as p-value of these variables is less than 0.05. In our further models we will keep “bedrooms”, “bathrooms” and “accommodates” and drop the “beds”.
+
+## Model 4
+
+We further consider whether superhosts (host_is_superhost) will influence our model.
+
+```{r}
+
+model4 <-lm(log(price_4_nights)~prop_type_simplified +
+              number_of_reviews+
+              room_type+
+              bathrooms+
+              bedrooms+
+              accommodates+
+              host_is_superhost, 
+            data=regression_data)
+
+#Look at model result
+
+msummary(model4)
+
+```
+
+```{r}
+
+#Check VIF
+
+car::vif(model4)
+
+```
+
+Superhosts commands a pricing premium in Istanbul because the p-value is less htan 0.05, therefore we will keep this variable in our further models. 
+
+## Model 5
+
+Most owners advertise the exact location of their listing (is_location_exact == TRUE), while a non-trivial proportion don’t. After controlling for other variables, we consider whether a listing’s exact location can be a significant predictor of price_4_nights.
+
+```{r}
+
+model5 <-lm(log(price_4_nights)~prop_type_simplified +
+              number_of_reviews+
+              room_type+
+              bathrooms+
+              bedrooms+
+              accommodates+
+              host_is_superhost+
+              is_location_exact,
+            data=regression_data)
+
+#Look at model result
+
+msummary(model5)
+
+```
+
+```{r}
+
+#Check VIF
+
+car::vif(model5)
+
+```
+
+The variable “is_location_exact” can be a relatively significant factor because its p-value is also less than 0.05, although adding it has few influences on the adjusted R sqaure. And we can keep it.
+
+## Model 6
+
+Now we consider the effect of cancellation_policy on price_4_nights, after we control for other variables.
+
+```{r}
+
+model6 <-lm(log(price_4_nights)~prop_type_simplified +
+              number_of_reviews+
+              room_type+
+              bathrooms+
+              bedrooms+
+              accommodates+
+              host_is_superhost+
+              is_location_exact+
+              cancellation_policy,
+            data=regression_data)
+
+#Look at model result
+
+msummary(model6)
+
+```
+
+```{r}
+
+#Check VIF
+
+car::vif(model6)
+
+```
+
+The cancellation policy of 14 days and 30 days seems to have a significant impact on the price for 4 nights. This is why we will keep the variable “cancellation policy” in our model. Our Adjusted R-squared again went up a little bit as well. Let us keep trying adding more variables that may turn out significant for our model.
+
+## Model 7
+
+Finally, we consider whether neighbourhoods will affect our model.
+
+```{r} 
+
+model7 <-lm(log(price_4_nights)~prop_type_simplified +
+              number_of_reviews+
+              room_type+
+              bathrooms+
+              bedrooms+
+              accommodates+
+              host_is_superhost+
+              is_location_exact+
+              cancellation_policy+
+              neighbourhood_group_cleaned,
+            data=regression_data)
+
+#Look at model result
+
+msummary(model7)
+
+```
+
+```{r}
+
+#Check VIF
+
+car::vif(model7)
+
+```
+
+The region of Istanbul has a significant influence on the price. p-value is nearly to zero and our adjusted R-squared goes up - it suggests that model 7 better describes the real data than our previous models.
+
+# Diagnostics
+
+## Check residuals
+
+In the next step we will plot residuals, analyze their behaviour and check whether they are distributed within the norms. Afterwards, we will compare all the models and compare how our models evolved.
+
+```{r}
+
+#plot residuals
+
+autoplot(model1)
+autoplot(model2)
+autoplot(model3)
+autoplot(model4)
+autoplot(model5)
+autoplot(model6)
+autoplot(model7)
+
+```
+
+## Compare different models
+
+```{r}
+
+#compare significance of variables among model iterations
+
+huxreg(model1,
+       model2,
+       model3,
+       model4,
+       model5,
+       model6,
+       model7)
+
+```
+
+
+From the table above, we find that model7 is the better model. We use broom::tidy() and broom::glance() to get more about the model.
+
+```{r}
+
+model7 %>% 
+  broom::tidy()
+
+```
+```{r}
+
+model7 %>% 
+  broom::glance()
+
+```
+
+
+# Prediction
+
+To predict the price for 2 people staying 4 nights in Istanbul, we need to first create a tibble that contains preferences and then feed it into our model. We have chosen 2 tourists who want to stay in an apartment with a private room, 2 bedrooms, 1 bathroom, and a moderate cancellation policy. The apartment is in European side and has 12 reviews, a rating of 96 and accommodates 2 people.
+
+```{r}
+
+#Create an imaginary situation representing the needs of our 2 tourists
+
+imaginary_Airbnb <- tibble(room_type = as.factor("Private room"), 
+                           prop_type_simplified = as.factor("Apartment"), 
+                           number_of_reviews = 12, 
+                           review_scores_rating = 96,
+                           has_breakfast = TRUE,
+                           accommodates = 2,
+                           host_is_superhost = TRUE,
+                           is_location_exact = FALSE,
+                           bedrooms = 2,
+                           bathrooms = 1,
+                           cancellation_policy = as.factor("moderate"),
+                           neighbourhood_group_cleaned = "European Side")
+
+#Predict price and prediction intervals
+
+price_predicted = exp(predict(model7, newdata = imaginary_Airbnb, interval = "prediction"))
+
+```
+
+# Conclusion
+
+Above is our final prediction for 2 people staying 4 nights in Istanbul. Our calculations show a mean for the predicted price of $821 with a lower and upper 95% confidence interval of $251 and $2693. This is a fairly reasonabe price for 4 nights in Istanbul for Airbnb accommodation.
+
+# Limitation
+
+First, regression analysis explains a linear relationship between dependent and independent variables. While we have selected the variables of our interests, we think the travel and tourism is impacted by qualitative variables as well, which may not be explainable via a regression model.
+
+Second, the data contained numerous missing values, which were mostly excluded during the cleaning of the data, reducing our initial number of observations. While we attempted to preserve the relevant information, omission of these observations may still cause errors in the model built upon the remaining observed values. Moreover, most of our variables were categorical variables and there were only a limited number of numerical values to use for the linear regression.
+
+Third, it is important to note that the information provided is as of June 2020, hence the data and our findings are profoundly skewed by the Covid-19’s impact on travel and tourism. Another aspect that should be considered is seasonality, namely this model reflects demand for Airbnbs in the month of June, however the demand and price points might fluctuate according to the time of the year depending on peak travel times such as over longer holidays that bring and inflow of tourism.
+
+Lastly, the reliability and accuracy of our source for the raw data is also questionable, given that the data was extracted from the website insideairbnb.com, which is an unaccounted for and unknown author.
+
+# Details
+
+- Team members: Arun Afzali, Blanche Lelouvier, Yuanmeng (Cathy) Gu, Elia Waidele, Ismaeel Haq
+- What, if anything, gave you the most trouble: select variables of interest, deal with neighbourhood_group_clean, find the best model
